@@ -18,7 +18,7 @@ class BERTClassifier(nn.Module):
         super(BERTClassifier, self).__init__()
         self.bert = bert
         self.dropout = nn.Dropout(0.1)
-        self.output = nn.Linear(768,318)
+        self.output = nn.Linear(768,345)
 
     def forward(self,inputs):
         input_ids, attention_mask, token_type_ids = inputs
