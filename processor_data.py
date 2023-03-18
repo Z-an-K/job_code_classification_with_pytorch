@@ -27,13 +27,13 @@ def extract_sample(file_path,is_train=True):
     new_data = new_data[new_data["code"]!=" "]
     new_data = new_data[new_data["field1"]!=" "]
     new_data = new_data[new_data["field2"]!=" "]
+
     text = np.array(new_data).tolist()
     if is_train == True:
         text = text[0:int(len(text)*0.8)]
     else:
         text = text[int(len(text)*0.8):]
     return text
-
 
 #分词
 def cut_word(line):
@@ -70,6 +70,7 @@ def map_code_to_field(code):
     if code not in code_map:
         code = 99999
     return code_map[code]
+
 def get_token_and_segments(tokenA,tokenB=None):
     tokens = ["[cls]"] + tokenA + ["[sep]"]
     segments = [0] * (len(tokenA) + 2)
@@ -86,7 +87,9 @@ def truncate_pair_of_tokens(tokenA,tokenB,seq_lens):
             tokenB.pop()
     return tokenA,tokenB
 def pad_input(text,tokenizer,seq_lens):
-    tokens,segments,label,field,attention=  [],[],[],[],[]
+    tokens,segments,field,label,attention=  [],[],[],[],[]
+    label_map = {}
+    i = 0
     for item in text:
         tokenA,tokenB = cut_word(item[0]),cut_word(map_code_to_field(int(item[2])))
         encoded_dict = tokenizer.encode_plus(tokenA,tokenB,max_length=seq_lens,
@@ -98,7 +101,15 @@ def pad_input(text,tokenizer,seq_lens):
         attention.append(attention_masks)
         tokens.append(input_ids)
         segments.append(token_type_ids)
+        #
         label.append(item[1])
+        if item[1] not in label_map.keys():
+            temp = {item[1]:i}
+            label_map.update(temp)
+            i += 1
+    for i,l in enumerate(label):
+        label[i] = label_map[l]
+
     tokens = torch.tensor(tokens)
     segments = torch.tensor(segments)
     attention = torch.tensor(attention)

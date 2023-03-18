@@ -7,12 +7,29 @@ from d2l import torch as d2l
 
 
 
+model_name = "bert-base-chinese"
+MODEL_PATH = "/home/zhanghan/PycharmProjects/learn_pytorch/bert-classification/bert-base-chinese"
+vocab_name = "vocab.txt"
+bert,tokenizer = load_pretrained_model(model_name,vocab_name,MODEL_PATH)
+net = BERTClassifier(bert)
+batch_size,sentence_lens = 8,16
+seq_lens = 24
+train_set = JobDataset(seq_lens,tokenizer,True)
+test_set = JobDataset(seq_lens,tokenizer,False)
+train_iter = DataLoader(train_set,batch_size,shuffle=True,num_workers=4)
+test_iter = DataLoader(test_set,batch_size,shuffle=False,num_workers=4)
+devices = torch.device("cuda")
+lr, num_epochs = 1e-4, 5
+trainer = torch.optim.Adam(net.parameters(), lr=lr)
+loss = nn.CrossEntropyLoss(reduction='none')
+
+
 def train_batch_ch13(net, X, y, loss, trainer, devices):
     if isinstance(X, list):
-        X = [x.to(devices[0]) for x in X]
+        X = [x.to(devices) for x in X]
     else:
-        X = X.to(devices[0])
-    y = y.to(devices[0])
+        X = X.to(devices)
+    y = y.to(devices)
     net.train()
     trainer.zero_grad()
     pred = net(X)
@@ -24,11 +41,11 @@ def train_batch_ch13(net, X, y, loss, trainer, devices):
     return train_loss_sum, train_acc_sum
 
 def train_ch13(net, train_iter, test_iter, loss, trainer, num_epochs,
-               devices=d2l.try_all_gpus()):
+               devices=devices):
     timer, num_batches = d2l.Timer(), len(train_iter)
     animator = d2l.Animator(xlabel='epoch', xlim=[1, num_epochs], ylim=[0, 1],
                             legend=['train loss', 'train acc', 'test acc'])
-    net = nn.DataParallel(net, device_ids=devices).to(devices[0])
+    net.to(devices)
     for epoch in range(num_epochs):
         metric = d2l.Accumulator(4)
         for i, (features, labels) in enumerate(train_iter):
@@ -43,26 +60,13 @@ def train_ch13(net, train_iter, test_iter, loss, trainer, num_epochs,
                               None))
         test_acc = d2l.evaluate_accuracy_gpu(net, test_iter)
         animator.add(epoch + 1, (None, None, test_acc))
+        print("epoch:",epoch)
     print(f'loss {metric[0] / metric[2]:.3f}, train acc '
           f'{metric[1] / metric[3]:.3f}, test acc {test_acc:.3f}')
     print(f'{metric[2] * num_epochs / timer.sum():.1f} examples/sec on '
           f'{str(devices)}')
 
 
-model_name = "bert-base-chinese"
-MODEL_PATH = "/home/zhanghan/PycharmProjects/learn_pytorch/bert-classification/bert-base-chinese"
-vocab_name = "vocab.txt"
-bert,tokenizer = load_pretrained_model(model_name,vocab_name,MODEL_PATH)
-net = BERTClassifier(bert)
-batch_size,sentence_lens = 32,32
-seq_lens = 24
-train_set = JobDataset(seq_lens,tokenizer,True)
-test_set = JobDataset(seq_lens,tokenizer,False)
-train_iter = DataLoader(train_set,batch_size,shuffle=True,num_workers=4)
-test_iter = DataLoader(test_set,batch_size,shuffle=False,num_workers=4)
-devices = ["cuda" if torch.cuda.is_available() else "cpu"]
-lr, num_epochs = 1e-4, 5
-trainer = torch.optim.Adam(net.parameters(), lr=lr)
-loss = nn.CrossEntropyLoss(reduction='none')
 train_ch13(net, train_iter, test_iter, loss, trainer, num_epochs,
     devices)
+
